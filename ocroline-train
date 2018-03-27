@@ -1,0 +1,213 @@
+#!/usr/bin/python
+
+import argparse
+import itertools
+import os
+
+import editdistance
+import psutil
+import pylab
+import torch
+from torch import nn
+import torch.optim as optim
+from torch.autograd import Variable
+import numpy as np
+
+import ocroline
+print dir(ocroline)
+from dlinputs import filters
+from dlinputs import gopen
+from dlinputs import sequence
+from dlinputs import utils
+from dltrainers import helpers
+from dltrainers import flex
+from dltrainers import layers
+
+# matplotlib.use("GTK")
+
+pylab.rc("image", cmap="hot")
+
+parser = argparse.ArgumentParser("""Train an RNN recognizer.
+
+LSTM parameters (for -L) include: project, nhidden, sizes, k, mp, mpk, relu, bn, vmp.
+
+""")
+parser.add_argument("-d", "--db", default="uw3-dew-training.tgz",
+                    help="training set")
+parser.add_argument("-t", "--testdb", default="uw3-dew-testing.tgz",
+                    help="testset")
+parser.add_argument("-s", "--shuffle", default=0, type=int,
+                    help="size for training data shuffle buffer (0=disable)")
+parser.add_argument("-b", "--batchsize", default=5, type=int,
+                    help="batch size for training")
+parser.add_argument("-B", "--testbatchsize", default=5, type=int,
+                    help="batchsize for tests")
+parser.add_argument("-n", "--normalize", default=False, action="store_true",
+                    help="apply text line normalization")
+
+parser.add_argument("-M", "--makemodel", default=None)
+
+parser.add_argument("-T", "--testevery", default=5000, type=int,
+                    help="how often to run the testset")
+parser.add_argument("--testverbose", action="store_true")
+
+parser.add_argument("-l", "--learningrate", default=1e-5, type=float,
+                    help="learning rate")
+parser.add_argument("--momentum", default=0.9, type=float,
+                    help="momentum")
+
+parser.add_argument("-R", "--output_frequency", default=1000, type=int,
+                    help="how often to display outputs")
+
+parser.add_argument("--stage", default="none")
+
+args = parser.parse_args()
+
+codec = sequence.ascii_codec
+
+def make_pipeline(batchsize=args.batchsize):
+    pipeline = [filters.rename(image="png", transcript="txt")]
+    if args.normalize:
+        normalizer = ocroline.CenterNormalizer()
+        pipeline += [filters.map(input=normalizer.measure_and_normalize)]
+    if args.shuffle > 0:
+        pipeline += [filters.shuffle(args.shuffle)]
+    pipeline += [filters.batchedbuckets(batchsize=batchsize)]
+    pipeline += [filters.map(image=sequence.seq_makebatch, transcript=codec.encode_batch)]
+    pipeline += [filters.map(image=lambda x: np.expand_dims(x, 3))]
+    return filters.compose(*pipeline)
+
+def make_model(ninput=48, noutput=97):
+    B, W, H, D = (0, 900), (0, 9000), ninput, (0, 5000)
+    return nn.Sequential(
+        # reorder to Torch conventions
+        layers.Reorder("BHWD", "BDHW"),
+        layers.CheckSizes(B, 1, H, W, name="input"),
+
+
+        # convolutional layers
+        flex.Conv2d(100, 3, padding=(1, 1)), # BDWH
+        nn.ReLU(),
+
+        # turn image into sequence
+        #layers.Reorder("BDHW", "BWDH"),
+        layers.Fun(lambda x: x.view(x.size(0), -1, x.size(3)), "BDHW->BDW"),
+        #layers.Reorder("BWD", "BDW"),
+        layers.CheckSizes(B, D, W),
+
+        # run 1D LSTM
+        flex.Lstm1(100),
+        flex.Conv1d(noutput, 1),
+
+        # reorder
+        layers.Reorder("BDW", "BWD"),
+        layers.CheckSizes(B, W, noutput, name="output")
+        )
+
+if args.makemodel is not None:
+    execfile(args.makemodel)
+
+def train_batch(model, input, target):
+    """Train a BHWD input batch against a BWD target batch."""
+    assert input.size(0) == target.size(0)
+    b, h, w, d = input.size()
+    assert d==1
+    input = Variable(input.cuda())
+    target = target.cuda()
+    logits = model.forward(input)
+    probs = helpers.sequence_softmax(logits)
+    optimizer.zero_grad()
+    deltas, aligned = helpers.ctc_loss(logits, target)
+    #assert deltas.size()[:2] == (b, w), (deltas.size(), (b, w))
+    #assert aligned.size()[:2] == (b, w), (aligned.size(), (b, w))
+    optimizer.step()
+    return probs, aligned
+
+def display_batch(total, input, target, probs, aligned):
+    truth = codec.decode_tensor(target[0])
+    aligned = codec.decode_tensor(aligned[0])
+    result = codec.decode_tensor(probs[0])
+    print "#", total
+    print "TRU", truth
+    print "ALN", aligned
+    print "PRE", result
+    if False and i%(args.output_frequency*10)==0:
+        pylab.clf()
+        pylab.subplot(311)
+        pylab.imshow(helpers.asnd(input[0]).T)
+        pylab.subplot(312)
+        pylab.imshow(helpers.asnd(target[0]).T)
+        pylab.subplot(313)
+        # imshow(ocroline.asnd(ocr.probs[0]).T, cmap=cm.gist_stern)
+        pylab.ginput(1, 0.001)
+
+# convert command line args into plain dict to add to save files
+parameters = {k: v for k, v in args.__dict__.items()}
+
+process = psutil.Process(os.getpid())
+
+def error(*args):
+    msg = " ".join([str(x) for x in args])
+    raise Exception(msg)
+
+def rss():
+    return process.memory_info().rss
+
+def eval_testset(model, testset, batchsize=args.testbatchsize):
+    pipeline = make_pipeline(batchsize=batchsize)
+    test_data = pipeline(gopen.sharditerator_once(testset))
+    nchars = 0
+    nlines = 0
+    total = 0
+    for batch in test_data:
+        input = helpers.astorch(batch["image"]).cuda()
+        logits = model.forward(Variable(input, volatile=True))
+        probs = helpers.sequence_softmax(logits)
+        results = codec.decode_batch(helpers.asnd(probs.cpu()))
+        targets = codec.decode_batch(batch["transcript"])
+        for i, (pre, tru) in enumerate(zip(results, targets)):
+            if args.testverbose:
+                print "TEST", i
+                print "TEST PRE", pre
+                print "TEST TRU", tru
+            assert isinstance(pre, str), pre
+            assert isinstance(tru, str), tru
+            errs = editdistance.eval(pre, tru)
+            total += errs
+            nchars += len(tru)
+        nlines += len(results)
+    return total*1.0/nchars, nchars, nlines
+
+pipeline = make_pipeline()
+training_data = pipeline(gopen.open_source(args.db))
+sample = training_data.next()
+utils.print_sample(sample)
+
+if True:
+    model = make_model()
+else:
+    model = torch.load(args.mname)
+
+input = Variable(helpers.astorch(sample["image"][:3, :, :20]), volatile=True)
+print "input", input.size()
+output = model.forward(input)
+print "output", output.size()
+flex.flex_freeze(model)
+print model
+model = model.cuda()
+model[0].cuda()
+print model
+
+optimizer = optim.SGD(model.parameters(), lr=args.learningrate, momentum=args.momentum)
+
+total = 0
+for epoch in xrange(100):
+    for i, sample in enumerate(itertools.islice(training_data, 0, args.testevery//args.batchsize)):
+        input = helpers.astorch(sample["image"])
+        target = helpers.astorch(sample["transcript"])
+        probs, aligned = train_batch(model, input, target)
+        if i % max(args.output_frequency//args.batchsize, 1) == 0:
+            display_batch(total, input, target, probs, aligned)
+        total += len(input)
+    err, nchars, nlines = eval_testset(model, args.testdb)
+    print "testset", total, err
