@@ -12,6 +12,7 @@ from torch import nn
 import torch.optim as optim
 from torch.autograd import Variable
 import numpy as np
+import re
 
 import ocroline
 print dir(ocroline)
@@ -45,7 +46,8 @@ parser.add_argument("-B", "--testbatchsize", default=5, type=int,
 parser.add_argument("-n", "--normalize", default=False, action="store_true",
                     help="apply text line normalization")
 
-parser.add_argument("-M", "--makemodel", default=None)
+parser.add_argument("-m", "--model", default=None,
+                    help="load model")
 
 parser.add_argument("-T", "--testevery", default=5000, type=int,
                     help="how often to run the testset")
@@ -58,12 +60,25 @@ parser.add_argument("--momentum", default=0.9, type=float,
 
 parser.add_argument("-R", "--output_frequency", default=1000, type=int,
                     help="how often to display outputs")
+parser.add_argument("--upload", default=None,
+                    help="command used for uploading; {} will be replaced with local file")
+parser.add_argument("--saveevery", type=int, default=-1,
+                    help="how often to save network (-1: every testset eval)")
+parser.add_argument("--savebase", default="temp",
+                    help="basename for output files")
+
+parser.add_argument("-D", "--makesource", default=None)
+parser.add_argument("-M", "--makemodel", default=None)
+parser.add_argument("-M", "--makepipeline", default=None)
 
 parser.add_argument("--stage", default="none")
 
 args = parser.parse_args()
 
 codec = sequence.ascii_codec
+
+def make_source():
+    return gopen.open_source(args.db)
 
 def make_pipeline(batchsize=args.batchsize):
     pipeline = [filters.rename(image="png", transcript="txt")]
@@ -83,27 +98,23 @@ def make_model(ninput=48, noutput=97):
         # reorder to Torch conventions
         layers.Reorder("BHWD", "BDHW"),
         layers.CheckSizes(B, 1, H, W, name="input"),
-
-
         # convolutional layers
         flex.Conv2d(100, 3, padding=(1, 1)), # BDWH
         nn.ReLU(),
-
         # turn image into sequence
-        #layers.Reorder("BDHW", "BWDH"),
-        layers.Fun(lambda x: x.view(x.size(0), -1, x.size(3)), "BDHW->BDW"),
-        #layers.Reorder("BWD", "BDW"),
+        layers.Reshape(0, [1, 2], 3),
         layers.CheckSizes(B, D, W),
-
         # run 1D LSTM
         flex.Lstm1(100),
         flex.Conv1d(noutput, 1),
-
         # reorder
         layers.Reorder("BDW", "BWD"),
-        layers.CheckSizes(B, W, noutput, name="output")
-        )
+        layers.CheckSizes(B, W, noutput, name="output"))
 
+if args.makesource is not None:
+    execfile(args.makesource)
+if args.makepipeline not None:
+    execfile(args.makepipeline)
 if args.makemodel is not None:
     execfile(args.makemodel)
 
@@ -142,7 +153,7 @@ def display_batch(total, input, target, probs, aligned):
         pylab.ginput(1, 0.001)
 
 # convert command line args into plain dict to add to save files
-parameters = {k: v for k, v in args.__dict__.items()}
+params = {k: v for k, v in args.__dict__.items()}
 
 process = psutil.Process(os.getpid())
 
@@ -178,36 +189,68 @@ def eval_testset(model, testset, batchsize=args.testbatchsize):
         nlines += len(results)
     return total*1.0/nchars, nchars, nlines
 
+def test_divergence(errors, scale=5, factor=2.0):
+    errors = [x[1] for x in errors]
+    if len(errors) < 2*scale+1:
+        return False
+    if factor*np.mean(errors[-2*scale:-scale]) < np.mean(errors[-scale:]):
+        return True
+    return False
+
+source = make_source()
 pipeline = make_pipeline()
-training_data = pipeline(gopen.open_source(args.db))
+training_data = pipeline(source)
 sample = training_data.next()
 utils.print_sample(sample)
 
-if True:
+if args.model is None:
     model = make_model()
+    ntrain = 0
+    input = Variable(helpers.astorch(sample["image"][:3, :, :20]), volatile=True)
+    print "input", input.size()
+    output = model.forward(input)
+    print "output", output.size()
+    flex.flex_freeze(model)
+    print model
 else:
-    model = torch.load(args.mname)
+    print "loading", args.model
+    model = torch.load(args.model)
+    print model
+    match = re.search(r".*-([0-9]{6,})-([0-9]{6,}).pt", args.model)
+    if match:
+        ntrain = 1000 * int(match.group(1))
+        print "setting ntrain to", ntrain
 
-input = Variable(helpers.astorch(sample["image"][:3, :, :20]), volatile=True)
-print "input", input.size()
-output = model.forward(input)
-print "output", output.size()
-flex.flex_freeze(model)
-print model
 model = model.cuda()
 model[0].cuda()
 print model
 
+
 optimizer = optim.SGD(model.parameters(), lr=args.learningrate, momentum=args.momentum)
 
-total = 0
+next_save = -1
+errs = []
 for epoch in xrange(100):
     for i, sample in enumerate(itertools.islice(training_data, 0, args.testevery//args.batchsize)):
         input = helpers.astorch(sample["image"])
+        ntrain += len(input)
         target = helpers.astorch(sample["transcript"])
         probs, aligned = train_batch(model, input, target)
         if i % max(args.output_frequency//args.batchsize, 1) == 0:
-            display_batch(total, input, target, probs, aligned)
-        total += len(input)
+            display_batch(ntrain, input, target, probs, aligned)
     err, nchars, nlines = eval_testset(model, args.testdb)
-    print "testset", total, err
+    errs.append((ntrain, err))
+    print "testset", ntrain, err
+    if args.saveevery < 0 or ntrain >= next_save:
+        next_save += args.saveevery
+        kilos = ntrain // 1000
+        micros = int(err * 1000000)
+        fname = "{}-{:06d}-{:06d}.pt".format(args.savebase, kilos, micros)
+        model.ERRORS = errs
+        model.PARAMS = params
+        print "saving", fname
+        torch.save(model, fname)
+        print "done"
+    if test_divergence(errs, scale=5, factor=2.0):
+        print "DIVERGENCE"
+        break
