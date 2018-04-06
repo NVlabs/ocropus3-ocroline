@@ -20,6 +20,7 @@ from dlinputs import filters
 from dlinputs import gopen
 from dlinputs import sequence
 from dlinputs import utils
+from dlinputs import paths
 from dltrainers import helpers
 from dltrainers import flex
 from dltrainers import layers
@@ -69,7 +70,7 @@ parser.add_argument("--savebase", default="temp",
 
 parser.add_argument("-D", "--makesource", default=None)
 parser.add_argument("-M", "--makemodel", default=None)
-parser.add_argument("-M", "--makepipeline", default=None)
+parser.add_argument("-P", "--makepipeline", default=None)
 
 parser.add_argument("--stage", default="none")
 
@@ -113,8 +114,10 @@ def make_model(ninput=48, noutput=97):
 
 if args.makesource is not None:
     execfile(args.makesource)
-if args.makepipeline not None:
+
+if args.makepipeline is not None:
     execfile(args.makepipeline)
+
 if args.makemodel is not None:
     execfile(args.makemodel)
 
@@ -216,10 +219,8 @@ else:
     print "loading", args.model
     model = torch.load(args.model)
     print model
-    match = re.search(r".*-([0-9]{6,})-([0-9]{6,}).pt", args.model)
-    if match:
-        ntrain = 1000 * int(match.group(1))
-        print "setting ntrain to", ntrain
+    ntrain, _ = paths.parse_save_path(args.model)
+    print "setting ntrain to", ntrain
 
 model = model.cuda()
 model[0].cuda()
@@ -242,13 +243,8 @@ for epoch in xrange(100):
     errs.append((ntrain, err))
     print "testset", ntrain, err
     if args.saveevery < 0 or ntrain >= next_save:
-        next_save += args.saveevery
-        kilos = ntrain // 1000
-        micros = int(err * 1000000)
-        fname = "{}-{:06d}-{:06d}.pt".format(args.savebase, kilos, micros)
-        model.ERRORS = errs
-        model.PARAMS = params
-        print "saving", fname
+        fname = paths.make_save_path(args.savebase, ntrain, err)
+        print "saving as", fname
         torch.save(model, fname)
         print "done"
     if test_divergence(errs, scale=5, factor=2.0):
