@@ -34,8 +34,9 @@ Note that `ocroline` requires a GPU for training, and the code currently also as
 There are some requirements for installation.
 
 
-```python
-!cat requirements.txt
+```bash
+%%bash
+cat requirements.txt
 ```
 
     -e git://github.com/NVlabs/dlinputs.git#egg=dlinputs
@@ -49,8 +50,9 @@ There are some requirements for installation.
 Training files are just tar files containing `.png` and corresponding `.txt` files with the ground truth.
 
 
-```python
-!tar -ztvf testdata/testlines.tgz | sed 6q
+```bash
+%%bash
+tar -ztvf testdata/testlines.tgz | sed 6q
 ```
 
     -rw-rw-r-- tmb/tmb           1 2018-03-24 23:57 000000.index
@@ -89,8 +91,9 @@ imshow(sample["png"])
 The training data for the line recognizer needs to be sized normalized. You can use the functions in `lineest.CenterLineNormalizer` for that. In this training set, the data is already normalized.
 
 
-```python
-!ocroline-train -d testdata/testlines.tgz -t testdata/testlines.tgz -T 100 -o testmodel --epochs 1
+```bash
+%%bash
+ocroline-train -d testdata/testlines.tgz -t testdata/testlines.tgz -T 100 -o testmodel --epochs 1
 ```
 
     ['CenterNormalizer', 'LineRecognizer', '__builtins__', '__doc__', '__file__', '__name__', '__package__', '__path__', 'lineest', 'recognizer']
