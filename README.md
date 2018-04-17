@@ -1,13 +1,4 @@
 
-
-```python
-%pylab inline
-rc("image", cmap="gray", interpolation="bicubic")
-```
-
-    Populating the interactive namespace from numpy and matplotlib
-
-
 ocroline
 ========
 
@@ -65,6 +56,15 @@ This is read internally using the `dlinputs` library. This library is also used 
 
 
 ```python
+%pylab inline
+rc("image", cmap="gray", interpolation="bicubic")
+```
+
+    Populating the interactive namespace from numpy and matplotlib
+
+
+
+```python
 from dlinputs import tarrecords
 sample = tarrecords.tariterator(open("testdata/testlines.tgz")).next()
 print sample["txt"]
@@ -77,7 +77,7 @@ imshow(sample["png"])
 
 
 
-    <matplotlib.image.AxesImage at 0x7faaf7b8e0d0>
+    <matplotlib.image.AxesImage at 0x7fea2b75e0d0>
 
 
 
@@ -115,8 +115,8 @@ ocroline-train -d testdata/testlines.tgz -t testdata/testlines.tgz -T 100 -o tes
     )
     # 5
     TRU body fill a region in a four-dimensional Preisach space. A thermodynamical
-    ALN g
-    PRE Q
+    ALN 
+    PRE Z
     testset 100 1.0
     saving as testmodel-000000000-1000000.pt
     done
@@ -173,7 +173,7 @@ imshow(sample["png"])
 
 
 
-    <matplotlib.image.AxesImage at 0x7faab4b8f210>
+    <matplotlib.image.AxesImage at 0x7fe9ea75f290>
 
 
 
