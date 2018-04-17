@@ -8,11 +8,6 @@ rc("image", cmap="gray", interpolation="bicubic")
     Populating the interactive namespace from numpy and matplotlib
 
 
-    /usr/local/lib/python2.7/dist-packages/IPython/core/magics/pylab.py:161: UserWarning: pylab import has clobbered these variables: ['rec', 'sample']
-    `%matplotlib` prevents importing * from pylab and numpy
-      "\n`%matplotlib` prevents importing * from pylab and numpy"
-
-
 ocroline
 ========
 
@@ -61,6 +56,8 @@ tar -ztvf testdata/testlines.tgz | sed 6q
     -rw-rw-r-- tmb/tmb           1 2018-03-24 23:57 000001.index
     -rw-rw-r-- tmb/tmb         424 2018-03-24 23:57 000001.png
     -rw-rw-r-- tmb/tmb           3 2018-03-24 23:57 000001.txt
+
+
     tar: write error
 
 
@@ -80,7 +77,7 @@ imshow(sample["png"])
 
 
 
-    <matplotlib.image.AxesImage at 0x7f549dd9e510>
+    <matplotlib.image.AxesImage at 0x7faaf7b8e0d0>
 
 
 
@@ -118,12 +115,14 @@ ocroline-train -d testdata/testlines.tgz -t testdata/testlines.tgz -T 100 -o tes
     )
     # 5
     TRU body fill a region in a four-dimensional Preisach space. A thermodynamical
-    ALN 
-    PRE >
+    ALN g
+    PRE Q
     testset 100 1.0
     saving as testmodel-000000000-1000000.pt
     done
 
+
+Note that `ocroline-train` uses the convention that all models are saved as `prefix-000000000-000000.pt`, where the first number is the number of training samples used for training (in thousands) and the second number is the error rate times one million.
 
 # Line Recognition
 
@@ -174,12 +173,12 @@ imshow(sample["png"])
 
 
 
-    <matplotlib.image.AxesImage at 0x7f5492652a90>
+    <matplotlib.image.AxesImage at 0x7faab4b8f210>
 
 
 
 
-![png](README_files/README_14_1.png)
+![png](README_files/README_15_1.png)
 
 
 
