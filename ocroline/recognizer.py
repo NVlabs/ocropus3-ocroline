@@ -8,7 +8,7 @@ from dlinputs import sequence
 class LineRecognizer(object):
     def __init__(self, mname, codec=None):
         self.codec = codec or sequence.ascii_codec
-        self.model = torch.load("/home/tmb/tmb-models/line2-000003330-004377.pt")
+        self.model = torch.load(mname)
         self.model.cuda()
         self.model.eval()
         self.normalizer = lineest.CenterNormalizer()
