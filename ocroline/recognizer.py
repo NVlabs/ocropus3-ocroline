@@ -1,9 +1,11 @@
-from numpy import *
 import torch
-from torch.autograd import Variable
-from ocroline import lineest
-from dltrainers import helpers
+from numpy import *
 from dlinputs import sequence
+from dltrainers import helpers
+from torch.autograd import Variable
+
+from ocroline import lineest
+
 
 class LineRecognizer(object):
     def __init__(self, mname, codec=None):
@@ -12,15 +14,18 @@ class LineRecognizer(object):
         self.model.cuda()
         self.model.eval()
         self.normalizer = lineest.CenterNormalizer()
+
     def recognize_line(self, line_image):
         assert amin(line_image) >= 0
         assert amax(line_image) <= 1
         self.line_image = array(line_image > 0.5, 'f')
-        self.normalized = self.normalizer.measure_and_normalize(self.line_image)
+        self.normalized = self.normalizer.measure_and_normalize(
+            self.line_image)
         tinput = torch.FloatTensor(self.normalized).cuda()[None, :, :, None]
         output = self.model.forward(Variable(tinput)).data.cpu()
         self.probs = array(helpers.sequence_softmax(output), 'f')
         return self.codec.decode_batch(self.probs)[0]
+
     def recognize_batch(self, line_images):
         images = []
         for image in line_images:

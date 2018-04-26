@@ -1,35 +1,37 @@
 from __future__ import print_function
 
-import sys
 import os
-import re
-from scipy import stats
-from scipy.ndimage import measurements, interpolation, filters
+
 from pylab import *
+from scipy.ndimage import filters, interpolation
 
 
 def autocrop0(image, threshold=1e-3, extra=2):
     bimage = image
-    if image.ndim==3: bimage = sum(bimage, 2)
+    if image.ndim == 3:
+        bimage = sum(bimage, 2)
     indexes = find(sum(bimage, 1) > threshold)
     lo = max(0, amin(indexes)-extra)
     hi = min(len(bimage), amax(indexes)+extra)
     return image[lo:hi]
 
+
 def autocrop(image, extra=2):
-    if image.ndim==2:
-        return autocrop0(autocrop0(image, extra=extra).transpose(1,0),
-                         extra=extra).transpose(1,0)
+    if image.ndim == 2:
+        return autocrop0(autocrop0(image, extra=extra).transpose(1, 0),
+                         extra=extra).transpose(1, 0)
     else:
-        return autocrop0(autocrop0(image, extra=extra).transpose(1,0,2),
-                         extra=extra).transpose(1,0,2)
+        return autocrop0(autocrop0(image, extra=extra).transpose(1, 0, 2),
+                         extra=extra).transpose(1, 0, 2)
+
 
 def scale_to_h(img, target_height, order=1, dtype=dtype('f'), cval=0):
     h, w = img.shape
     scale = target_height * 1.0 / h
     target_width = int(scale * w)
     output = interpolation.affine_transform(1.0 * img, eye(2) / scale, order=order,
-                                            output_shape=(target_height, target_width),
+                                            output_shape=(
+                                                target_height, target_width),
                                             mode='constant', cval=cval)
     output = array(output, dtype=dtype)
     return output
@@ -69,7 +71,8 @@ class CenterNormalizer:
         h, w = img.shape
         padded = vstack([cval * ones((h, w)), img, cval * ones((h, w))])
         center = self.center + h
-        dewarped = [padded[center[i] - self.r:center[i] + self.r, i] for i in range(w)]
+        dewarped = [padded[center[i] - self.r:center[i] + self.r, i]
+                    for i in range(w)]
         try:
             dewarped = array(dewarped, dtype=dtype).T
         except ValueError, e:
@@ -86,6 +89,7 @@ class CenterNormalizer:
         return scaled
 
     def measure_and_normalize(self, line):
-        if line.ndim==3: line = mean(line, 2)
+        if line.ndim == 3:
+            line = mean(line, 2)
         self.measure(line)
         return self.normalize(line)

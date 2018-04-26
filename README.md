@@ -77,7 +77,7 @@ imshow(sample["png"])
 
 
 
-    <matplotlib.image.AxesImage at 0x7fea2b75e0d0>
+    <matplotlib.image.AxesImage at 0x7f669fa834d0>
 
 
 
@@ -116,7 +116,7 @@ ocroline-train -d testdata/testlines.tgz -t testdata/testlines.tgz -T 100 -o tes
     # 5
     TRU body fill a region in a four-dimensional Preisach space. A thermodynamical
     ALN 
-    PRE Z
+    PRE &
     testset 100 1.0
     saving as testmodel-000000000-1000000.pt
     done
@@ -130,7 +130,7 @@ Note that `ocroline-train` uses the convention that all models are saved as `pre
 ```bash
 %%bash
 model=line2-000003330-004377.pt
-test -f $model || wget -nd https://storage.googleapis.com/tmb-models/$model
+test -f $model || wget --quiet -nd https://storage.googleapis.com/tmb-models/$model
 ```
 
 The `LineRecognizer` class wraps up the line recognizer in a small, simple-to-use class. This class will always perform line normalization on its input. It can also perform batching of multiple lines if you want to recognize multiple lines together.
@@ -173,7 +173,7 @@ imshow(sample["png"])
 
 
 
-    <matplotlib.image.AxesImage at 0x7fe9ea75f290>
+    <matplotlib.image.AxesImage at 0x7f66611d5bd0>
 
 
 

@@ -7,10 +7,10 @@ def make_model(ninput=48, noutput=97):
 
 
         # convolutional layers
-        flex.Conv2d(100, 3, padding=(1, 1)), # BDWH
+        flex.Conv2d(100, 3, padding=(1, 1)),  # BDWH
         nn.ReLU(),
         nn.MaxPool2d(3),
-        flex.Conv2d(100, 3, padding=(1, 1)), # BDWH
+        flex.Conv2d(100, 3, padding=(1, 1)),  # BDWH
         flex.BatchNorm2d(),
         nn.ReLU(),
 
@@ -27,4 +27,4 @@ def make_model(ninput=48, noutput=97):
         # reorder
         layers.Reorder("BDW", "BWD"),
         layers.CheckSizes(B, W, noutput, name="output")
-        )
+    )
