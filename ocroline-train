@@ -63,9 +63,9 @@ parser.add_argument("--saveevery", type=int, default=-1,
 parser.add_argument("-o", "--savebase", default="temp",
                     help="basename for output files")
 
-parser.add_argument("-D", "--makesource", default=None)
-parser.add_argument("-M", "--makemodel", default=None)
-parser.add_argument("-P", "--makepipeline", default=None)
+parser.add_argument("--load", nargs="*", default=[])
+parser.add_argument("--exec", dest="execute", nargs="*", default=[])
+parser.add_argument("--sync", default=None)
 
 parser.add_argument("--stage", default="none")
 
@@ -112,15 +112,10 @@ def make_model(ninput=48, noutput=97):
         layers.CheckSizes(B, W, noutput, name="output"))
 
 
-if args.makesource is not None:
-    execfile(args.makesource)
-
-if args.makepipeline is not None:
-    execfile(args.makepipeline)
-
-if args.makemodel is not None:
-    execfile(args.makemodel)
-
+for e in args.load:
+    execfile(e)
+for e in args.execute:
+    exec e
 
 def train_batch(model, input, target):
     """Train a BHWD input batch against a BWD target batch."""
@@ -254,6 +249,10 @@ for epoch in xrange(args.epochs):
         fname = paths.make_save_path(args.savebase, ntrain, err)
         print "saving as", fname
         torch.save(model, fname)
+        if args.sync is not None:
+            cmd = args.sync.format(fname=fname, ntrain=ntrain, base=args.savebase)
+            print "#", cmd
+            exec cmd
         print "done"
     if test_divergence(errs, scale=5, factor=2.0):
         print "DIVERGENCE"
