@@ -252,7 +252,7 @@ for epoch in xrange(args.epochs):
         if args.sync is not None:
             cmd = args.sync.format(fname=fname, ntrain=ntrain, base=args.savebase)
             print "#", cmd
-            exec cmd
+            assert os.system(cmd) == 0
         print "done"
     if test_divergence(errs, scale=5, factor=2.0):
         print "DIVERGENCE"
