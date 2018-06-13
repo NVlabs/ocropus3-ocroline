@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import os
+import sys
 import argparse
 import itertools
 
@@ -257,3 +258,5 @@ for epoch in xrange(args.epochs):
     if test_divergence(errs, scale=5, factor=2.0):
         print "DIVERGENCE"
         break
+    sys.stdout.flush()
+    sys.stderr.flush()
