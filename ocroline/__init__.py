@@ -1,2 +1,2 @@
-from lineest import CenterNormalizer
-from recognizer import LineRecognizer
+from .lineest import CenterNormalizer
+from .recognizer import LineRecognizer

@@ -1,10 +1,7 @@
-from __future__ import print_function
-
 import os
 
 from pylab import *
 from scipy.ndimage import filters, interpolation
-
 
 def autocrop0(image, threshold=1e-3, extra=2):
     bimage = image
@@ -57,7 +54,7 @@ class CenterNormalizer:
         a = argmax(smoothed, axis=0)
         a = filters.gaussian_filter(a, h * self.extra)
         self.center = array(a, 'i')
-        deltas = abs(arange(h)[:, newaxis] - self.center[newaxis, :])
+        deltas = abs(arange(h)[:, newaxis] - self.center[newaxis,:])
         self.mad = mean(deltas[line != 0])
         self.r = int(1 + self.range * self.mad)
         if self.debug:
@@ -75,7 +72,7 @@ class CenterNormalizer:
                     for i in range(w)]
         try:
             dewarped = array(dewarped, dtype=dtype).T
-        except ValueError, e:
+        except ValueError as e:
             print(e)
             return img
         return dewarped

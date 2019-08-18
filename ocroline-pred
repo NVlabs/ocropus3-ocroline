@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 import os
 import os.path
 import argparse
@@ -27,7 +27,7 @@ parser.add_argument("input")
 parser.add_argument("output", nargs="?")
 
 args = parser.parse_args()
-ARGS = {k: v for k, v in args.__dict__.items()}
+ARGS = {k: v for k, v in list(args.__dict__.items())}
 
 
 def make_source():
@@ -54,9 +54,9 @@ def make_pipeline():
 
 
 if args.makesource:
-    execfile(args.makesource)
+    exec(compile(open(args.makesource, "rb").read(), args.makesource, 'exec'))
 if args.makepipeline:
-    execfile(args.makepipeline)
+    exec(compile(open(args.makepipeline, "rb").read(), args.makepipeline, 'exec'))
 
 
 def pixels_to_batch(x):
@@ -77,9 +77,9 @@ if args.output:
 
 mname = paths.find_file(model_path, args.model)
 assert mname is not None, "model not found"
-print "loading", mname
+print("loading", mname)
 rec = ocroline.LineRecognizer(mname)
-print rec.model
+print(rec.model)
 
 
 def display_batch(image, output):
@@ -107,7 +107,7 @@ for i, sample in enumerate(source):
             ginput(1, 1e-3)
         waitforbuttonpress(0.0001)
     for line in output:
-        print line
+        print(line)
 
 if args.output:
     sink.close()

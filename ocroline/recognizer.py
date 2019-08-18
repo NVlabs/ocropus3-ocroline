@@ -1,9 +1,7 @@
 import torch
 from numpy import *
-from dlinputs import sequence
-from dltrainers import helpers
-from torch.autograd import Variable
-
+#from dlinputs import sequence
+#from dltrainers import helpers
 from ocroline import lineest
 
 
@@ -21,7 +19,7 @@ class LineRecognizer(object):
         self.line_image = array(line_image > 0.5, 'f')
         self.normalized = self.normalizer.measure_and_normalize(
             self.line_image)
-        tinput = torch.FloatTensor(self.normalized).cuda()[None, :, :, None]
+        tinput = torch.FloatTensor(self.normalized).cuda()[None,:,:, None]
         output = self.model.forward(Variable(tinput)).data.cpu()
         self.probs = array(helpers.sequence_softmax(output), 'f')
         return self.codec.decode_batch(self.probs)[0]
@@ -35,7 +33,7 @@ class LineRecognizer(object):
             normalized = self.normalizer.measure_and_normalize(image)
             images.append(normalized)
         self.batch = sequence.seq_makebatch(images)
-        tinput = torch.FloatTensor(self.batch).cuda()[:, :, :, None]
+        tinput = torch.FloatTensor(self.batch).cuda()[:,:,:, None]
         output = self.model.forward(Variable(tinput)).data.cpu()
         self.probs = array(helpers.sequence_softmax(output), 'f')
         return self.codec.decode_batch(self.probs)

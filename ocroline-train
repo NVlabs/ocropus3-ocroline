@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 import os
 import sys
@@ -18,7 +18,7 @@ from torch.autograd import Variable
 
 import ocroline
 
-print dir(ocroline)
+print(dir(ocroline))
 
 # matplotlib.use("GTK")
 
@@ -114,9 +114,9 @@ def make_model(ninput=48, noutput=97):
 
 
 for e in args.load:
-    execfile(e)
+    exec(compile(open(e, "rb").read(), e, 'exec'))
 for e in args.execute:
-    exec e
+    exec(e)
 
 def train_batch(model, input, target):
     """Train a BHWD input batch against a BWD target batch."""
@@ -139,10 +139,10 @@ def display_batch(total, input, target, probs, aligned):
     truth = codec.decode_tensor(target[0])
     aligned = codec.decode_tensor(aligned[0])
     result = codec.decode_tensor(probs[0])
-    print "#", total
-    print "TRU", truth
-    print "ALN", aligned
-    print "PRE", result
+    print("#", total)
+    print("TRU", truth)
+    print("ALN", aligned)
+    print("PRE", result)
     if False and i % (args.output_frequency*10) == 0:
         pylab.clf()
         pylab.subplot(311)
@@ -155,7 +155,7 @@ def display_batch(total, input, target, probs, aligned):
 
 
 # convert command line args into plain dict to add to save files
-params = {k: v for k, v in args.__dict__.items()}
+params = {k: v for k, v in list(args.__dict__.items())}
 
 process = psutil.Process(os.getpid())
 
@@ -183,9 +183,9 @@ def eval_testset(model, testset, batchsize=args.testbatchsize):
         targets = codec.decode_batch(batch["transcript"])
         for i, (pre, tru) in enumerate(zip(results, targets)):
             if args.testverbose:
-                print "TEST", i
-                print "TEST PRE", pre
-                print "TEST TRU", tru
+                print("TEST", i)
+                print("TEST PRE", pre)
+                print("TEST TRU", tru)
             assert isinstance(pre, str), pre
             assert isinstance(tru, str), tru
             errs = editdistance.eval(pre, tru)
@@ -207,7 +207,7 @@ def test_divergence(errors, scale=5, factor=2.0):
 source = make_source()
 pipeline = make_pipeline()
 training_data = pipeline(source)
-sample = training_data.next()
+sample = next(training_data)
 utils.print_sample(sample)
 
 if args.model is None:
@@ -215,19 +215,19 @@ if args.model is None:
     ntrain = 0
     input = Variable(helpers.astorch(
         sample["image"][:3, :, :20]), volatile=True)
-    print "input", input.size()
+    print("input", input.size())
     output = model.forward(input)
-    print "output", output.size()
+    print("output", output.size())
     flex.flex_freeze(model)
 else:
-    print "loading", args.model
+    print("loading", args.model)
     model = torch.load(args.model)
     ntrain, _ = paths.parse_save_path(args.model)
-    print "setting ntrain to", ntrain
+    print("setting ntrain to", ntrain)
 
 model = model.cuda()
 model[0].cuda()
-print model
+print(model)
 
 
 optimizer = optim.SGD(model.parameters(),
@@ -235,7 +235,7 @@ optimizer = optim.SGD(model.parameters(),
 
 next_save = -1
 errs = []
-for epoch in xrange(args.epochs):
+for epoch in range(args.epochs):
     for i, sample in enumerate(itertools.islice(training_data, 0, args.testevery//args.batchsize)):
         input = helpers.astorch(sample["image"])
         ntrain += len(input)
@@ -245,18 +245,18 @@ for epoch in xrange(args.epochs):
             display_batch(ntrain, input, target, probs, aligned)
     err, nchars, nlines = eval_testset(model, args.testdb)
     errs.append((ntrain, err))
-    print "testset", ntrain, err
+    print("testset", ntrain, err)
     if args.saveevery < 0 or ntrain >= next_save:
         fname = paths.make_save_path(args.savebase, ntrain, err)
-        print "saving as", fname
+        print("saving as", fname)
         torch.save(model, fname)
         if args.sync is not None:
             cmd = args.sync.format(fname=fname, ntrain=ntrain, base=args.savebase)
-            print "#", cmd
+            print("#", cmd)
             assert os.system(cmd) == 0
-        print "done"
+        print("done")
     if test_divergence(errs, scale=5, factor=2.0):
-        print "DIVERGENCE"
+        print("DIVERGENCE")
         break
     sys.stdout.flush()
     sys.stderr.flush()
